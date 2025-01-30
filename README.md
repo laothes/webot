@@ -5,7 +5,8 @@ A WeChat chatbot powered by Azure OpenAI GPT models.
 ## Project Structure
 ```
 ├── __pycache__
-├── templates           
+├── templates       
+├── __init__.py    
 ├── bot.py                 # Main implementation - v0.2
 ├── config_handler.py
 ├── LICENSE.txt           
