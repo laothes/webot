@@ -14,7 +14,7 @@ A WeChat chatbot powered by Azure OpenAI GPT models.
 ├── requirements.txt      
 ├── webot.ico            
 ├── webot-win 0.1.zip    # .exe v0.1
-└── webot-win 0.2.zip    # .exe v0.2 (16,009 KB)
+└── webot-win 0.2.zip    # .exe v0.2
 ```
 
 ## Acknowledgements
