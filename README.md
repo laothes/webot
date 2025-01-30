@@ -35,7 +35,7 @@ pip install -r requirements.txt
 
 ## Versions
 
-### WeBot v0.2 (Latest)
+### WeBot v0.2
 Updates from v0.1:
 - Custom Azure OpenAI API configuration
 - Customizable chat settings
@@ -43,7 +43,7 @@ Updates from v0.1:
 - Removed built-in Azure OpenAI API
 
 ### WeBot v0.1
-Initial release with GPT-4 (requires WeChat Pay activation)
+Initial release with GPT-4o (requires WeChat Pay activation)
 
 ## Features
 
