@@ -402,10 +402,9 @@ def get_azure_openai_response(message, user_id):
             "role": "system",
             "content": (
                 f"{style_prompt}\n"
-                f"用简洁自然的语言进行回复。{'解释性的回复内容内容不要超过60个字' if needs_explanation else '日常交流的回复内容大约7个字且不要超过15个字'}。"
+                f"用简洁自然的语言进行回复。{'解释性的回复内容内容不要超过60个字' if needs_explanation else '日常交流的回复内容不要超过20个字'}。"
                 "完全模仿目标用户的说话风格，包括用词习惯、表情使用、标点符号等特征。"
                 "根据聊天上下文理解用户意图，确保回复内容贴合对话场景。"
-
             )
         }
 
@@ -421,7 +420,7 @@ def get_azure_openai_response(message, user_id):
         completion = client.chat.completions.create(
             model=deployment,
             messages=messages,
-            max_tokens=60 if needs_explanation else 15,
+            max_tokens=60 if needs_explanation else 20,
             temperature=0.8,
             top_p=0.95,
             frequency_penalty=0.5,
