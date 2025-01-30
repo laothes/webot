@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>微信机器人监控面板</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f0f2f5;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .chat-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            height: calc(100vh - 40px);
+            display: flex;
+        }
+        .sidebar {
+            width: 300px;
+            border-right: 1px solid #e4e4e4;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .chat-header {
+            padding: 20px;
+            border-bottom: 1px solid #e4e4e4;
+            background: white;
+            border-radius: 15px 15px 0 0;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+        }
+         .message-container {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .message-bubble {
+            max-width: 70%;
+            margin-bottom: 20px;
+            clear: both;
+        }
+        .message-user {
+            float: left;
+        }
+        .message-bot {
+            float: right;
+        }
+        .message-content {
+            padding: 12px 16px;
+            border-radius: 15px;
+            position: relative;
+            word-wrap: break-word;
+        }
+        .message-user .message-content {
+            background: white;
+            margin-left: 45px;
+        }
+        .message-bot .message-content {
+            background: #95ec69;
+            margin-right: 45px;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            position: absolute;
+            bottom: 0;
+        }
+        .message-user .avatar {
+            left: 0;
+        }
+        .message-bot .avatar {
+            right: 0;
+        }
+        .message-info {
+            font-size: 0.8em;
+            color: #999;
+            margin: 5px 45px;
+        }
+        .message-user .message-info {
+            text-align: left;
+        }
+        .message-bot .message-info {
+            text-align: right;
+        }
+        .stats-container {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .user-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .user-item {
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+        }
+        .user-item:hover {
+            background-color: #f0f2f5;
+            transform: translateX(5px);
+        }
+        .user-item.active {
+            background-color: #e3f2fd;
+            transform: translateX(5px);
+        }
+        .user-item img {
+            transition: transform 0.2s;
+        }
+        .user-item:hover img {
+            transform: scale(1.1);
+        }
+        .refresh-button {
+            padding: 8px 15px;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .refresh-button:hover {
+            background: #1557b0;
+        }
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-online {
+            background-color: #4caf50;
+        }
+        .empty-state {
+            text-align: center;
+            color: #666;
+            margin-top: 50px;
+        }
+
+        /* 控制面板侧边栏样式 */
+        .control-panel-sidebar {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+            transition: right 0.3s ease;
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .control-panel-sidebar.open {
+            right: 0;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .overlay.active {
+            display: block;
+        }
+
+        .control-panel-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1001;
+        }
+        .control-panel-sidebar {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+            transition: right 0.3s ease;
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .config-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .config-section h5 {
+            margin-bottom: 15px;
+            color: #1a73e8;
+        }
+
+        .form-floating {
+            margin-bottom: 15px;
+        }
+
+        .config-help {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="sidebar">
+            <div class="stats-container">
+                <h5><i class="bi bi-graph-up"></i> 统计信息</h5>
+                <div class="stats-item">
+                    <span>总消息数</span>
+                    <span id="total-messages">0</span>
+                </div>
+                <div class="stats-item">
+                    <span>活跃用户</span>
+                    <span id="active-users">0</span>
+                </div>
+                <div class="stats-item">
+                    <span>今日消息</span>
+                    <span id="today-messages">0</span>
+                </div>
+            </div>
+            <h5><i class="bi bi-people"></i> 聊天列表</h5>
+            <div class="user-list" id="user-list">
+                <!-- 用户列表将在这里动态加载 -->
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="chat-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <span class="status-indicator status-online"></span>
+                        <span id="current-user">所有用户</span>
+                    </h4>
+                    <button class="refresh-button" onclick="updateMessages()">
+                        <i class="bi bi-arrow-clockwise"></i> 刷新
+                    </button>
+                </div>
+                <div class="text-muted small">
+                    上次更新: <span id="last-update">-</span>
+                </div>
+            </div>
+
+            <div class="chat-messages" id="messages">
+                <!-- 消息将在这里动态加载 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 控制面板按钮 -->
+    <button class="btn btn-primary control-panel-button" onclick="toggleControlPanel()">
+        打开控制面板
+    </button>
+
+    <!-- 控制面板侧边栏 -->
+    <div class="control-panel-sidebar" id="controlPanel">
+        <h4>机器人控制面板</h4>
+        <div class="mb-3">
+            <label class="form-label">自动回复</label>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoReplySwitch" onchange="toggleAutoReply()">
+                <label class="form-check-label" for="autoReplySwitch">启用自动回复</label>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">学习用户</label>
+            <select class="form-select" id="userSelect" onchange="handleUserSelect()">
+                <option value="">选择用户</option>
+                <!-- 动态加载用户 -->
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">当前状态</label>
+            <span id="statusIndicator" class="badge bg-secondary">已停止</span>
+        </div>
+
+        <div class="config-section">
+            <h5><i class="bi bi-gear"></i> Azure OpenAI 配置</h5>
+
+            <div class="form-floating mb-3">
+                <input type="text" class="form-control" id="endpointUrl" value="">
+                <label for="endpointUrl">Endpoint URL</label>
+            </div>
+
+            <div class="form-floating mb-3">
+                <input type="text" class="form-control" id="deploymentName" value="">
+                <label for="deploymentName">Deployment Name</label>
+            </div>
+
+            <div class="form-floating mb-3">
+                <input type="password" class="form-control" id="apiKey"
+                       value="">
+                <label for="apiKey">API Key</label>
+            </div>
+
+            <div class="form-floating mb-3">
+                <input type="text" class="form-control" id="apiVersion" value="">
+                <label for="apiVersion">API Version</label>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h5><i class="bi bi-chat"></i> 聊天配置</h5>
+
+            <div class="form-floating mb-3">
+                <input type="number" class="form-control" id="fixTime" value="">
+                <label for="fixTime">回复延迟(秒)</label>
+                <div class="config-help">设置机器人回复消息的延迟时间</div>
+            </div>
+
+            <div class="form-floating mb-3">
+                <input type="number" class="form-control" id="minMessages" value="">
+                <label for="minMessages">最小消息分析数量</label>
+                <div class="config-help">触发风格分析的最小消息数量</div>
+            </div>
+
+            <div class="form-floating mb-3">
+                <input type="number" class="form-control" id="maxMessages" value="">
+                <label for="maxMessages">最大消息分析数量</label>
+                <div class="config-help">用于分析的最大消息数量</div>
+            </div>
+        </div>
+         <div class="d-grid mt-3">
+            <button class="btn btn-primary" onclick="saveConfiguration()">保存</button>
+         </div>
+    </div>
+
+
+    <!-- 遮罩层 -->
+    <div class="overlay" id="overlay" onclick="toggleControlPanel()"></div>
+
+    <script>
+        let activeUsers = new Set();
+        let todayMessages = 0;
+        let selectedUser = null;
+        let lastMessageId = null;
+
+
+        // 控制面板逻辑
+        function toggleControlPanel() {
+            const controlPanel = document.getElementById('controlPanel');
+            const overlay = document.getElementById('overlay');
+            controlPanel.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
+
+        function toggleAutoReply() {
+            const autoReplySwitch = document.getElementById('autoReplySwitch');
+            const statusIndicator = document.getElementById('statusIndicator');
+            const isEnabled = autoReplySwitch.checked;
+
+            fetch('/api/auto-reply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: isEnabled })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusIndicator.textContent = isEnabled ? '运行中' : '已停止';
+                    statusIndicator.className = isEnabled ? 'badge bg-success' : 'badge bg-secondary';
+                }
+            })
+            .catch(error => {
+                console.error('切换自动回复失败:', error);
+            });
+        }
+
+        function handleUserSelect() {
+            const userSelect = document.getElementById('userSelect');
+            const selectedUserId = userSelect.value;
+
+            fetch('/api/learning-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: selectedUserId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`已选择用户: ${userSelect.options[userSelect.selectedIndex].text}`);
+                }
+            })
+            .catch(error => {
+                console.error('选择用户失败:', error);
+            });
+        }
+
+        function loadFriends() {
+            fetch('/api/friends')
+            .then(response => response.json())
+            .then(data => {
+                const userSelect = document.getElementById('userSelect');
+                userSelect.innerHTML = '<option value="">选择用户</option>';
+                data.friends.forEach(friend => {
+                    const option = document.createElement('option');
+                    option.value = friend.id;
+                    option.textContent = friend.nickname;
+                    userSelect.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('加载用户列表失败:', error);
+            });
+        }
+
+        // 页面加载时加载用户列表
+        window.onload = loadFriends;
+
+        // 原有消息逻辑
+        function formatTime(timeStr) {
+            const date = new Date(timeStr);
+            return date.toLocaleString();
+        }
+
+        function isToday(timeStr) {
+            const date = new Date(timeStr);
+            const today = new Date();
+            return date.getDate() === today.getDate() &&
+                   date.getMonth() === today.getMonth() &&
+                   date.getFullYear() === today.getFullYear();
+        }
+
+        function filterMessagesByUser(user) {
+            selectedUser = user;
+            updateMessages();
+
+            document.querySelectorAll('.user-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('data-user') === user) {
+                    item.classList.add('active');
+                }
+            });
+
+            document.getElementById('current-user').textContent = user ? user : '所有用户';
+        }
+
+        function updateMessages() {
+            fetch('/messages')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('messages');
+                    const messageContainer = document.createElement('div');
+                    messageContainer.className = 'message-container';
+                    container.innerHTML = ''; // Clear existing messages
+
+                    activeUsers.clear();
+                    todayMessages = 0;
+
+                    let filteredMessages = selectedUser ?
+                        data.messages.filter(msg => msg.sender_name === selectedUser) :
+                        data.messages;
+
+                    // Sort messages by creation time (ascending)
+                    filteredMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+                    filteredMessages.forEach(msg => {
+                        activeUsers.add(msg.sender_name);
+                        if (isToday(msg.created_at)) {
+                            todayMessages++;
+                        }
+
+                        messageContainer.innerHTML += `
+                            <div class="message-bubble message-user">
+                                <img src="https://api.dicebear.com/6.x/initials/svg?seed=${msg.sender_name}" class="avatar" alt="user">
+                                <div class="message-content">
+                                    ${msg.message}
+                                </div>
+                                <div class="message-info">
+                                    ${msg.sender_name} · ${msg.created_at}
+                                </div>
+                            </div>
+                            <div class="message-bubble message-bot">
+                                <img src="https://api.dicebear.com/6.x/bottts/svg?seed=bot" class="avatar" alt="bot">
+                                <div class="message-content">
+                                    ${msg.reply}
+                                </div>
+                                <div class="message-info">
+                                    机器人 · ${msg.created_at}
+                                </div>
+                            </div>
+                        `;
+
+                        lastMessageId = msg.id;
+                    });
+
+                    container.appendChild(messageContainer);
+
+                    // Scroll to bottom smoothly if new messages arrived
+                    if (filteredMessages.length > 0) {
+                        container.scrollTo({
+                            top: container.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    }
+
+                    // Update statistics and user list
+                    updateStats(data.messages.length);
+                    updateUserList();
+                    document.getElementById('last-update').textContent = new Date().toLocaleString();
+                })
+                .catch(error => {
+                    console.error('获取消息失败:', error);
+                });
+        }
+
+        function updateStats(totalMessages) {
+            document.getElementById('total-messages').textContent = totalMessages;
+            document.getElementById('active-users').textContent = activeUsers.size;
+            document.getElementById('today-messages').textContent = todayMessages;
+        }
+
+        function updateUserList() {
+            const userList = document.getElementById('user-list');
+            userList.innerHTML = `
+                <div class="user-item ${!selectedUser ? 'active' : ''}"
+                     onclick="filterMessagesByUser(null)"
+                     data-user="all">
+                    <img src="https://api.dicebear.com/6.x/initials/svg?seed=all"
+                         style="width: 30px; height: 30px; border-radius: 50%; margin-right: 10px;">
+                    所有用户
+                </div>
+            `;
+
+            activeUsers.forEach(user => {
+                userList.innerHTML += `
+                    <div class="user-item ${selectedUser === user ? 'active' : ''}"
+                         onclick="filterMessagesByUser('${user}')"
+                         data-user="${user}">
+                        <img src="https://api.dicebear.com/6.x/initials/svg?seed=${user}"
+                             style="width: 30px; height: 30px; border-radius: 50%; margin-right: 10px;">
+                        ${user}
+                    </div>
+                `;
+            });
+        }
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            updateMessages();
+            // Update every 30 seconds
+            setInterval(updateMessages, 30000);
+        })
+
+        function saveConfiguration() {
+            const config = {
+                endpointUrl: document.getElementById('endpointUrl').value,
+                deploymentName: document.getElementById('deploymentName').value,
+                apiKey: document.getElementById('apiKey').value,
+                apiVersion: document.getElementById('apiVersion').value,
+                fixTime: parseInt(document.getElementById('fixTime').value),
+                minMessages: parseInt(document.getElementById('minMessages').value),
+                maxMessages: parseInt(document.getElementById('maxMessages').value)
+            };
+
+            fetch('/api/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(config)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('配置已保存');
+                } else {
+                    alert('保存失败: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('保存配置失败:', error);
+                alert('保存配置失败，请查看控制台获取详细信息');
+            });
+        }
+
+        // Load configuration on page load
+        function loadConfiguration() {
+            fetch('/api/config')
+                .then(response => response.json())
+                .then(config => {
+                    document.getElementById('endpointUrl').value = config.endpointUrl;
+                    document.getElementById('deploymentName').value = config.deploymentName;
+                    document.getElementById('apiKey').value = config.apiKey;
+                    document.getElementById('apiVersion').value = config.apiVersion;
+                    document.getElementById('fixTime').value = config.fixTime;
+                    document.getElementById('minMessages').value = config.minMessages;
+                    document.getElementById('maxMessages').value = config.maxMessages;
+                })
+                .catch(error => console.error('加载配置失败:', error));
+        }
+
+        // Add loadConfiguration to your existing window.onload
+        const originalOnload = window.onload;
+        window.onload = function() {
+            if (originalOnload) originalOnload();
+            loadConfiguration();
+        };
+
+    </script>
+</body>
+</html>
