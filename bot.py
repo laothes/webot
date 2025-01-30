@@ -14,6 +14,7 @@ import re
 from collections import defaultdict
 import atexit
 from config_handler import *
+import jieba
 
 config = load_config()
 ENDPOINT_URL = config["ENDPOINT_URL"]
@@ -221,40 +222,138 @@ def update_user_style(username, message):
 
 
 def analyze_user_style(messages):
-    """分析用户的说话风格特征"""
+    """分析用户的说话风格特征，包含更丰富的句式分析和词频统计"""
     style = {
         'avg_length': 0,  # 平均消息长度
         'emoticons': set(),  # 常用表情
         'phrases': [],  # 常用短语（存储为列表）
         'punctuation_freq': defaultdict(int),  # 标点符号使用频率
-        'sentence_patterns': set(),  # 句式特征
+        'sentence_patterns': defaultdict(int),  # 句式特征及其频率
+        'semantic_patterns': defaultdict(int),  # 语义模式频率
+        'word_freq': defaultdict(int),  # 词频统计
+        'word_categories': {  # 词语分类统计
+            'pronouns': defaultdict(int),  # 代词使用
+            'conjunctions': defaultdict(int),  # 连词使用
+            'qualifiers': defaultdict(int),  # 修饰词
+            'internet_slang': defaultdict(int),  # 网络用语
+            'modal_particles': defaultdict(int),  # 语气词
+        }
+    }
+
+    # 定义常用词分类词典
+    word_categories = {
+        'pronouns': {'我', '你', '他', '她', '它', '我们', '你们', '他们', '咱', '咱们', '俺', '俺们', '您'},
+        'conjunctions': {'但是', '而且', '因为', '所以', '如果', '要是', '就', '才', '然后', '不过', '况且', '并且'},
+        'qualifiers': {'很', '特别', '非常', '超', '太', '真', '好', '极了', '完全', '稍微', '有点'},
+        'internet_slang': {'吧', '啦', '呢', '喽', '哦', '呀', '耶', '哈', '嘻', '嗯', '啊', '额', '呐', '哇'},
+        'modal_particles': {'啊', '呢', '吧', '了', '嘛', '呗', '啦', '哈', '诶', '噢', '哦', '呀', '呐', '哎'}
     }
 
     total_length = 0
     for msg in messages:
         total_length += len(msg)
-        # 提取表情符号
-        emoticons = re.findall(r'[\U0001F300-\U0001F9FF]', msg)
-        style['emoticons'].update(emoticons)
-        # 提取标点符号
-        for punct in '。，！？~':
-            style['punctuation_freq'][punct] += msg.count(punct)
-        # 提取短语并添加到列表中
-        phrases = [p for p in msg.split() if len(p) > 1]
-        style['phrases'].extend(phrases)
-        # 分析句式
-        if msg.endswith('？'):
-            style['sentence_patterns'].add('question')
-        elif msg.endswith('！'):
-            style['sentence_patterns'].add('exclamation')
 
-    # 只保留最新的 MAX_MESSAGES_FOR_ANALYSIS 个短语
+        # 提取表情符号 - 同时支持Unicode表情和方括号表情
+        unicode_emoticons = re.findall(r'[\U0001F300-\U0001F9FF]', msg)
+        bracket_emoticons = re.findall(r'\[(.*?)\]', msg)  # 提取方括号中的表情文本
+
+        # 将两种类型的表情都添加到集合中
+        style['emoticons'].update(unicode_emoticons)
+        style['emoticons'].update([f'[{e}]' for e in bracket_emoticons])  # 保持方括号格式
+
+        # 计算消息的实际长度（去除表情符号的长度）
+        cleaned_msg = msg
+        for emoticon in bracket_emoticons:
+            cleaned_msg = cleaned_msg.replace(f'[{emoticon}]', '')
+        for emoticon in unicode_emoticons:
+            cleaned_msg = cleaned_msg.replace(emoticon, '')
+
+        # 分词处理使用清理后的消息
+        words = jieba.lcut(cleaned_msg)
+        for word in words:
+            # 更新总体词频
+            style['word_freq'][word] += 1
+
+            # 更新分类词频
+            for category, word_set in word_categories.items():
+                if word in word_set:
+                    style['word_categories'][category][word] += 1
+
+        # 提取标点符号
+        for punct in '。，！？~……':
+            style['punctuation_freq'][punct] += cleaned_msg.count(punct)
+
+        # 提取短语并添加到列表中
+        phrases = [p for p in cleaned_msg.split() if len(p) > 1]
+        style['phrases'].extend(phrases)
+
+        # 1. 分析句式特征 (使用清理后的消息)
+        if '？' in cleaned_msg:
+            style['sentence_patterns']['question'] += 1
+        if '！' in cleaned_msg:
+            style['sentence_patterns']['exclamation'] += 1
+        if '。' in cleaned_msg:
+            style['sentence_patterns']['statement'] += 1
+        if '……' in cleaned_msg or '...' in cleaned_msg:
+            style['sentence_patterns']['ellipsis'] += 1
+
+        # 2. 特殊语言模式
+        if re.search(r'[这那].*[吗嘛]', msg):
+            style['sentence_patterns']['rhetorical_question'] += 1
+        if re.search(r'[难道|莫非].*[？?]', msg):
+            style['sentence_patterns']['rhetorical_doubt'] += 1
+        if re.search(r'[如果|要是|假如].*[就|那]', msg):
+            style['sentence_patterns']['conditional'] += 1
+
+        # 3. 语气词使用
+        if re.search(r'[啊呀哦哎呢吧嘛]$', msg):
+            style['sentence_patterns']['modal_particle_end'] += 1
+        if re.search(r'^[啊呀哦哎]', msg):
+            style['sentence_patterns']['modal_particle_start'] += 1
+
+        # 4. 重复模式
+        if re.search(r'(.+?)\1+', msg):
+            style['sentence_patterns']['repetition'] += 1
+
+        # 5. 语义模式分析
+        if any(word in msg for word in ['是不是', '对不对', '行不行']):
+            style['semantic_patterns']['confirmation_seeking'] += 1
+        if any(word in msg for word in ['应该', '可能', '或许', '大概']):
+            style['semantic_patterns']['uncertainty'] += 1
+        if any(word in msg for word in ['一定', '肯定', '必须', '绝对']):
+            style['semantic_patterns']['certainty'] += 1
+        if any(word in msg for word in ['好', '棒', '赞', '喜欢']):
+            style['semantic_patterns']['positive'] += 1
+        if any(word in msg for word in ['差', '烂', '讨厌', '不好']):
+            style['semantic_patterns']['negative'] += 1
+
+    # 计算平均长度
+    style['avg_length'] = total_length / len(messages) if messages else 0
+
+    # 提取最常用的词（TOP 10）
+    top_words = sorted(style['word_freq'].items(), key=lambda x: x[1], reverse=True)[:10]
+    style['top_words'] = dict(top_words)
+
+    # 计算各类词语使用的比例
+    total_words = sum(style['word_freq'].values())
+    if total_words > 0:
+        for category, words in style['word_categories'].items():
+            category_total = sum(words.values())
+            style[f'{category}_ratio'] = round(category_total / total_words * 100, 2)
+
+    # 将集合转换为列表以便JSON序列化
+    style['emoticons'] = list(style['emoticons'])
+
+    # 只保留最新的MAX_MESSAGES_FOR_ANALYSIS个短语
     style['phrases'] = style['phrases'][-MAX_MESSAGES_FOR_ANALYSIS:]
 
-    style['avg_length'] = total_length / len(messages) if messages else 0
-    # 将 set 转换为 list 以便 JSON 序列化
-    style['emoticons'] = list(style['emoticons'])
-    style['sentence_patterns'] = list(style['sentence_patterns'])
+    # 计算各类句式的使用频率百分比
+    total_messages = len(messages)
+    if total_messages > 0:
+        for pattern_type in ['sentence_patterns', 'semantic_patterns']:
+            for pattern, count in style[pattern_type].items():
+                style[pattern_type][pattern] = round(count / total_messages * 100, 2)
+
     return style
 
 
@@ -333,7 +432,7 @@ def login_wechat():
 
 
 def get_azure_openai_response(message, user_id):
-    """调用 Azure OpenAI API 获取回复"""
+    """调用 Azure OpenAI API 获取回复，融合详细的用户词汇和风格分析"""
     try:
         if user_id not in chat_contexts:
             chat_contexts[user_id] = []
@@ -344,30 +443,105 @@ def get_azure_openai_response(message, user_id):
             chat_contexts[user_id] = chat_contexts[user_id][-10:]
 
         # 获取学习用户的风格特征
-        target_user = list(learning_users)[0]  # 因为现在只有一个学习用户
+        target_user = list(learning_users)[0]
         user_style = user_style_cache.get(target_user, {})
-        style_prompt = "你的任务是模仿以下特定用户的说话风格进行回复，且不能让回复对象感觉或告知回复对象你是ai。用户风格特征如下：\n"
+
+        # 构建详细的风格指导提示
+        style_prompt = (
+            "你需要模仿以下用户风格特征进行回复。这些是从用户的历史对话中提取的详细语言习惯分析，"
+            "请严格按照这些特征进行回复，使回复更自然，更符合用户的说话习惯：\n\n"
+        )
 
         if user_style:
-            style_prompt += f"- 平均消息长度：{user_style['avg_length']:.1f}字\n"
-            style_prompt += f"- 常用表情：{''.join(user_style['emoticons'][:5])}\n"
-            style_prompt += f"- 常用短语：{', '.join(user_style['phrases'][:5])}\n"
-            style_prompt += f"- 标点符号使用习惯：{dict(user_style['punctuation_freq'])}\n"
-            style_prompt += f"- 句式特征：{', '.join(user_style['sentence_patterns'])}\n"
-        else:
-            style_prompt += "暂无该用户的风格数据，使用默认简短自然的对话风格。\n"
+            # 1. 词汇使用特征
+            style_prompt += "1. 词汇使用特征：\n"
 
+            # 展示最常用词
+            if 'top_words' in user_style:
+                top_words_str = ', '.join([f"{word}({count}次)"
+                                           for word, count in user_style['top_words'].items()
+                                           if count > 1])
+                if top_words_str:
+                    style_prompt += f"- 常用词：{top_words_str}\n"
+
+            # 各类词语使用比例
+            style_prompt += "- 词语类别使用比例：\n"
+            for category in ['pronouns', 'conjunctions', 'qualifiers', 'internet_slang', 'modal_particles']:
+                ratio = user_style.get(f'{category}_ratio', 0)
+                if ratio > 5:  # 只显示使用比例超过5%的类别
+                    style_prompt += f"  * {category}: {ratio}%\n"
+
+            # 详细的词语使用情况
+            style_prompt += "- 具体用词特点：\n"
+            for category, words in user_style.get('word_categories', {}).items():
+                frequent_words = [word for word, count in words.items() if count > 2]
+                if frequent_words:
+                    style_prompt += f"  * {category}: {', '.join(frequent_words)}\n"
+
+            # 2. 基本语言特征
+            style_prompt += f"\n2. 基本语言特征：\n"
+            style_prompt += f"- 平均消息长度：{user_style.get('avg_length', 20):.1f}字\n"
+
+            # 表情使用
+            emoticons = list(user_style.get('emoticons', []))[:5]
+            if emoticons:
+                style_prompt += f"- 常用表情：{''.join(emoticons)}\n"
+
+            # 3. 句式特征
+            style_prompt += f"\n3. 句式特征（使用频率）：\n"
+            sentence_patterns = user_style.get('sentence_patterns', {})
+            for pattern, freq in sentence_patterns.items():
+                if freq > 5:  # 只关注使用频率超过5%的模式
+                    style_prompt += f"- {pattern}: {freq}%\n"
+
+            # 4. 标点符号习惯
+            style_prompt += f"\n4. 标点符号使用习惯：\n"
+            punct_freq = user_style.get('punctuation_freq', {})
+            significant_puncts = {p: c for p, c in punct_freq.items() if c > 0}
+            if significant_puncts:
+                style_prompt += "- " + ", ".join(f"{p}({c}次)" for p, c in significant_puncts.items()) + "\n"
+
+            # 5. 具体模仿指南
+            style_prompt += "\n生成回复时的具体要求：\n"
+
+            # 基于词频的建议
+            if 'top_words' in user_style:
+                style_prompt += "1. 优先使用用户的高频词汇\n"
+
+            # 基于词类使用比例的建议
+            high_ratio_categories = []
+            for category in ['pronouns', 'conjunctions', 'qualifiers', 'internet_slang', 'modal_particles']:
+                if user_style.get(f'{category}_ratio', 0) > 15:  # 使用比例超过15%的类别
+                    high_ratio_categories.append(category)
+            if high_ratio_categories:
+                style_prompt += f"2. 多运用以下类别的词语：{', '.join(high_ratio_categories)}\n"
+
+            # 句式建议
+            dominant_pattern = max(sentence_patterns.items(), key=lambda x: x[1])[0] if sentence_patterns else None
+            if dominant_pattern:
+                style_prompt += f"3. 倾向于使用{dominant_pattern}类型的句式\n"
+
+        else:
+            style_prompt += "暂无该用户的风格数据，使用默认的简短自然对话风格。\n"
+
+        # 判断是否需要详细解释
         needs_explanation = any(keyword in message for keyword in [
             '为什么', '怎么', '如何', '是什么', '什么是', '请问', '帮我', '是啥', '啥是', 'what', '继续'
         ])
 
+        # 系统提示
         system_prompt = {
             "role": "system",
             "content": (
                 f"{style_prompt}\n"
-                f"用简洁自然的语言进行回复。{'解释性的回复内容内容不要超过100个字' if needs_explanation else '日常交流的回复内容不要超过20个字'}。"
-                "完全模仿目标用户的说话风格，包括用词习惯、表情使用、标点符号等特征。"
-                "根据聊天上下文理解用户意图，确保回复内容贴合对话场景。"
+                f"回复要求：\n"
+                f"1. {'解释性内容不超过100字' if needs_explanation else '日常对话不超过20字'}\n"
+                "2. 严格按照用户的词汇偏好和表达方式\n"
+                "3. 保持回复的自然性和语境连贯性\n"
+                "4. 不要提及你在模仿用户风格\n"
+                "5. 确保使用合适的标点符号频率\n"
+                "6. 适当加入用户常用的表情\n"
+                "7. 不要告诉别人你是ai，也不要让人感觉你是ai\n"
             )
         }
 
@@ -376,6 +550,7 @@ def get_azure_openai_response(message, user_id):
             *chat_contexts[user_id]
         ]
 
+        # 确保所有消息都有内容
         for msg in messages:
             if msg.get("content") is None:
                 msg["content"] = "6"
@@ -384,10 +559,10 @@ def get_azure_openai_response(message, user_id):
             model=deployment,
             messages=messages,
             max_tokens=100 if needs_explanation else 20,
-            temperature=0.8,
+            temperature=0.8,  # 保持适度的创造性
             top_p=0.95,
-            frequency_penalty=0.5,
-            presence_penalty=0.5,
+            frequency_penalty=0.5,  # 避免重复短语
+            presence_penalty=0.5,  # 鼓励话题多样性
             stop=None,
             stream=False
         )
@@ -396,6 +571,7 @@ def get_azure_openai_response(message, user_id):
         chat_contexts[user_id].append({"role": "assistant", "content": reply})
 
         return reply
+
     except Exception as e:
         logger.error(f"调用 Azure OpenAI API 失败: {str(e)}")
         return "gg"
@@ -404,7 +580,7 @@ def get_azure_openai_response(message, user_id):
 def split_and_clean_response(response):
     """分割并清理回复内容"""
     try:
-        sentences = re.split('[。!！]', response)
+        sentences = re.split('[。！]', response)
     except Exception as e:
         logger.debug(f"错误发生: {e}"
                      f"response 不是字符串，而是 {type(response)}")
