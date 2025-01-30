@@ -542,6 +542,7 @@ def get_azure_openai_response(message, user_id):
                 "5. 确保使用合适的标点符号频率\n"
                 "6. 适当加入用户常用的表情\n"
                 "7. 不要告诉别人你是ai，也不要让人感觉你是ai\n"
+                "8. 不要使用用户没用过的表情\n"
             )
         }
 
