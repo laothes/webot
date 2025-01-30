@@ -332,43 +332,6 @@ def login_wechat():
         return False
 
 
-def select_user_to_learn():
-    """在运行时选择要学习的单个用户"""
-    print("\n=== 选择要学习的用户 ===")
-    friends = itchat.get_friends()
-
-    # 显示所有好友列表
-    print("\n当前好友列表:")
-    for i, friend in enumerate(friends):
-        print(f"{i + 1}. 昵称: {friend['NickName']}, 备注: {friend['RemarkName'] or '无'}")
-
-    while True:
-        try:
-            print("\n请输入要学习的用户编号（输入q退出）：")
-            choice = input().strip()
-
-            if choice.lower() == 'q':
-                return None
-
-            # 解析用户输入的编号
-            idx = int(choice) - 1
-            if 0 <= idx < len(friends):
-                user = friends[idx]
-                print(f"\n已选择用户: {user['NickName']} ({user['RemarkName'] or '无备注'})")
-                confirm = input("确认选择这个用户吗？(y/n): ").strip().lower()
-                if confirm == 'y':
-                    return user['UserName']
-            else:
-                print(f"无效的编号: {idx + 1}")
-
-            print("请重新选择...")
-
-        except ValueError:
-            print("输入格式错误，请输入数字编号")
-        except Exception as e:
-            print(f"发生错误: {str(e)}")
-
-
 def get_azure_openai_response(message, user_id):
     """调用 Azure OpenAI API 获取回复"""
     try:
@@ -395,14 +358,14 @@ def get_azure_openai_response(message, user_id):
             style_prompt += "暂无该用户的风格数据，使用默认简短自然的对话风格。\n"
 
         needs_explanation = any(keyword in message for keyword in [
-            '为什么', '怎么', '如何', '是什么', '什么是', '请问', '帮我', '是啥', '啥是', 'what'
+            '为什么', '怎么', '如何', '是什么', '什么是', '请问', '帮我', '是啥', '啥是', 'what', '继续'
         ])
 
         system_prompt = {
             "role": "system",
             "content": (
                 f"{style_prompt}\n"
-                f"用简洁自然的语言进行回复。{'解释性的回复内容内容不要超过60个字' if needs_explanation else '日常交流的回复内容不要超过20个字'}。"
+                f"用简洁自然的语言进行回复。{'解释性的回复内容内容不要超过100个字' if needs_explanation else '日常交流的回复内容不要超过20个字'}。"
                 "完全模仿目标用户的说话风格，包括用词习惯、表情使用、标点符号等特征。"
                 "根据聊天上下文理解用户意图，确保回复内容贴合对话场景。"
             )
@@ -420,7 +383,7 @@ def get_azure_openai_response(message, user_id):
         completion = client.chat.completions.create(
             model=deployment,
             messages=messages,
-            max_tokens=60 if needs_explanation else 20,
+            max_tokens=100 if needs_explanation else 20,
             temperature=0.8,
             top_p=0.95,
             frequency_penalty=0.5,
@@ -441,7 +404,7 @@ def get_azure_openai_response(message, user_id):
 def split_and_clean_response(response):
     """分割并清理回复内容"""
     try:
-        sentences = re.split('[。，!！]', response)
+        sentences = re.split('[。!！]', response)
     except Exception as e:
         logger.debug(f"错误发生: {e}"
                      f"response 不是字符串，而是 {type(response)}")

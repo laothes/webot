@@ -13,8 +13,8 @@ A WeChat chatbot powered by Azure OpenAI GPT models.
 ├── README.md             
 ├── requirements.txt      
 ├── webot.ico            
-├── webot-win 0.1.zip    # .exe v0.1
-└── webot-win 0.2.zip    # .exe v0.2
+├── webot-win 0.1.7z    # .exe v0.1
+└── webot-win 0.2.7z   # .exe v0.2
 ```
 
 ## Acknowledgements
@@ -68,6 +68,7 @@ Initial release with GPT-4o (requires WeChat Pay activation)
 ## Notes
 - WeBot Cannot reply to group messages
 - v0.1 API limits: 100,000 tokens/min, 600 requests/min
+- If you encounter the issue `Log in time out, reloading QR code`, please refer to [itchat QR Code Timeout Solution](https://blog.csdn.net/weixin_45968042/article/details/135580437) (CSDN Blog)
 
 ## License
 MIT License - see [LICENSE](LICENSE) file for details.
